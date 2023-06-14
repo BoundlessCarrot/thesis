@@ -28,14 +28,14 @@ classdef RabbitObj
 
 % This is based off the ChatGPt interpretation of the initial paper, with some guidance
 
-mask_32 = 0xFFFFFFFF;
-mask_64 = 0xFFFFFFFFFFFFFFFF;
+mask32 = 0xFFFFFFFF;
+mask64 = 0xFFFFFFFFFFFFFFFF;
 % round_constants = [0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D, 0xD34D34D3];
-round_constants = [0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D]
+round_constants = [0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D];
 
-function key_setup(key0, key1, initialization_vector)
-  x = [ initialization_vector, key0[1], key1[0] ];
-  c = [ key1[1], initialization_vector, key0[0] ];
+function [x, c] = key_setup(key0, key1, initialization_vector)
+  x = [ initialization_vector, key0(1), key1(1) ];
+  c = [ key1(2), initialization_vector, key0(2) ];
 
   for i = 0:4
     % x = [ x, mod(x[i] + c[i], 2^32) ];
@@ -45,27 +45,27 @@ end
 
 function rabbit_round(x, c, round_constant)
   % G1 func
-  g1 = (x[0] + x[12] + round_constant) & mask_32;
-  g1 = (g1 << 7) | (g1 >> 25) & mask_32;
-  g1 ^= (x[4] + g1) & mask_32;
+  g1 = bitxor(x(1) + x(13) + round_constant, mask32);
+  g1 = bitxor(bitshift(g1, 7), bitshift(g1, -25));
+  g1 = bitxor(g1, bitand(x(5) + g1, mask32));
 
   % G2 func
-  g2 = (x[4] + x[0] + round_constant) & mask_32;
-  g2 = (g2 << 9) | (g2 >> 23) & mask_32;
-  g2 ^= (x[8] + g2) & mask_32;
+  g2 = bitxor(x(5) + x(1) + round_constant, mask32);
+  g2 = bitxor(bitshift(g2, 9), bitshift(g2, -23));
+  g2 = bitxor(g2, bitand(x(9) + g2, mask32));
 
   % Update state
-  for j = 0:16
-    x[j] = (x[j + 16] + g2 + (x[j] ^ g1)) & mask_32;
-    c[j] = (c[j + 16] + g1 + (c[j] ^ g2)) & mask_32;
+  for j = 1:16
+    x(j) = bitand(x(j + 16) + g2 + bitxor(x(j), g1), mask32);
+    c(j) = bitand(c(j + 16) + g1 + bitxor(c(j), g2), mask32);
   end
 end
 
 function output = process_block(x, c)
-  keystream = string.empty;
-  for k = 0:128
+  keystream = [];
+  for k = 1:128
     % Gen. clock-controlled bit
-    bit = (x[0] ^ c[0]) & 1;
+    bit = bitand(x(1), c(1));
     keystream = [ keystream, bit ];
 
     % Update internal state if necessary
@@ -149,5 +149,7 @@ out6 = [ 0x4D, 0x10, 0x51, 0xA1, 0x23, 0xAF, 0xB6, 0x70,
   0x5B, 0x2C, 0xF4, 0x47, 0x79, 0xF2, 0xC8, 0x96, 
   0xCB, 0x51, 0x15, 0xF0, 0x34, 0xF0, 0x3D, 0x31, 
   0x17, 0x1C, 0xA7, 0x5F, 0x89, 0xFC, 0xCB, 0x9F ];
+
+check(st(key1), [], st(out1))
 
 %%
