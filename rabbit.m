@@ -28,19 +28,20 @@ classdef RabbitObj
 
 % This is based off the ChatGPt interpretation of the initial paper, with some guidance
 
-mask32 = 0xFFFFFFFF;
-mask64 = 0xFFFFFFFFFFFFFFFF;
+mask32 = hex2dec('FFFFFFFF');
+mask64 = hex2dec('FFFFFFFFFFFFFFFF');
 % round_constants = [0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D, 0xD34D34D3];
-round_constants = [0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D];
+round_constants = [hex2dec('4D34D34D'), hex2dec('D34D34D3'), hex2dec('34D34D34'), hex2dec('4D34D34D')];
 
 function [x, c] = key_setup(key0, key1, initialization_vector)
   x = [ initialization_vector, key0(1), key1(1) ];
   c = [ key1(2), initialization_vector, key0(2) ];
 
-  for i = 0:4
+  for i = 1:4
     % x = [ x, mod(x[i] + c[i], 2^32) ];
-    rabbit_round(x, c, round_constants[i])
+    rabbit_round(x, c, round_constants(i))
   end
+  output = [ x, c ];
 end
 
 function rabbit_round(x, c, round_constant)
@@ -80,17 +81,17 @@ function a = st(b)
   a = char(b);
 end
 
-function check(key, iv, out)
-  msg = char(0*ones(1, 48));
-  cipher = Rabbit(key, iv); % Assuming you have implemented the Rabbit cipher in MATLAB
+function check(key0, key1, iv, out)
+  msg = char(zeros(1, 48));
+  cipher = run_rabbit(key0, key1, iv); % Assuming you have implemented the Rabbit cipher in MATLAB
 
   data = py.cipher.crypt(msg);
   assert(isequal(data, out));
 end
 
 function output = run_rabbit(key0, key1, initialization_vector)
-  key_setup(key0, key1, initialization_vector);
-  output = process_block(x, c);
+  work_arrs = key_setup(key0, key1, initialization_vector);
+  output = process_block(work_arrs(1), work_arrs(2)
 end
 
 key1  = [ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
