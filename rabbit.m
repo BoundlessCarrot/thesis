@@ -28,93 +28,12 @@ classdef RabbitObj
 
 % This is based off the ChatGPt interpretation of the initial paper, with some guidance
 
-mask32 = hex2dec('FFFFFFFF');
-mask64 = hex2dec('FFFFFFFFFFFFFFFF');
-% round_constants = [0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D, 0xD34D34D3, 0x34D34D34, 0x4D34D34D, 0xD34D34D3];
-round_constants = [hex2dec('4D34D34D'), hex2dec('D34D34D3'), hex2dec('34D34D34'), hex2dec('4D34D34D')];
-
-function [x, c] = key_setup(key0, key1, initialization_vector)
-  x = [ initialization_vector, key0(1), key1(1) ];
-  c = [ key1(2), initialization_vector, key0(2) ];
-
-  for i = 1:4
-    % x = [ x, mod(x[i] + c[i], 2^32) ];
-    rabbit_round(x, c, round_constants(i))
-  end
-  output = [ x, c ];
-end
-
-function rabbit_round(x, c, round_constant)
-  % G1 func
-  g1 = bitxor(x(1) + x(13) + round_constant, mask32);
-  g1 = bitxor(bitshift(g1, 7), bitshift(g1, -25));
-  g1 = bitxor(g1, bitand(x(5) + g1, mask32));
-
-  % G2 func
-  g2 = bitxor(x(5) + x(1) + round_constant, mask32);
-  g2 = bitxor(bitshift(g2, 9), bitshift(g2, -23));
-  g2 = bitxor(g2, bitand(x(9) + g2, mask32));
-
-  % Update state
-  for j = 1:16
-    x(j) = bitand(x(j + 16) + g2 + bitxor(x(j), g1), mask32);
-    c(j) = bitand(c(j + 16) + g1 + bitxor(c(j), g2), mask32);
-  end
-end
-
-function output = process_block(x, c)
-  keystream = [];
-  for k = 1:128
-    % Gen. clock-controlled bit
-    bit = bitand(x(1), c(1));
-    keystream = [ keystream, bit ];
-
-    % Update internal state if necessary
-    if mod(k, 8) == 7
-      rabbit_round(x, c, round_constants[mod(k, 8)]
-    end
-  end
-  output = string(keystream);
-end
-
-function a = st(b)
-  a = char(b);
-end
-
-function check(key0, key1, iv, out)
-  msg = char(zeros(1, 48));
-  cipher = run_rabbit(key0, key1, iv); % Assuming you have implemented the Rabbit cipher in MATLAB
-
-  data = py.cipher.crypt(msg);
-  assert(isequal(data, out));
-end
-
-function output = run_rabbit(key0, key1, initialization_vector)
-  work_arrs = key_setup(key0, key1, initialization_vector);
-  output = process_block(work_arrs(1), work_arrs(2)
-end
-
-key1  = [ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
-
-key2  = [ 0xAC, 0xC3, 0x51, 0xDC, 0xF1, 0x62, 0xFC, 0x3B, 
-  0xFE, 0x36, 0x3D, 0x2E, 0x29, 0x13, 0x28, 0x91 ];
-
 key3  = [ 0x43, 0x00, 0x9B, 0xC0, 0x01, 0xAB, 0xE9, 0xE9,
   0x33, 0xC7, 0xE0, 0x87, 0x15, 0x74, 0x95, 0x83 ];
-
-iv1   = [ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
 
 iv2   = [ 0x59, 0x7E, 0x26, 0xC1, 0x75, 0xF5, 0x73, 0xC3 ];
 
 iv3   = [ 0x27, 0x17, 0xF4, 0xD2, 0x1A, 0x56, 0xEB, 0xA6 ];
-
-out1  = [ 0x02, 0xF7, 0x4A, 0x1C, 0x26, 0x45, 0x6B, 0xF5, 
-  0xEC, 0xD6, 0xA5, 0x36, 0xF0, 0x54, 0x57, 0xB1,
-  0xA7, 0x8A, 0xC6, 0x89, 0x47, 0x6C, 0x69, 0x7B,
-  0x39, 0x0C, 0x9C, 0xC5, 0x15, 0xD8, 0xE8, 0x88, 
-  0x96, 0xD6, 0x73, 0x16, 0x88, 0xD1, 0x68, 0xDA,
-  0x51, 0xD4, 0x0C, 0x70, 0xC3, 0xA1, 0x16, 0xF4 ];
 
 out2  = [ 0x9C, 0x51, 0xE2, 0x87, 0x84, 0xC3, 0x7F, 0xE9, 
   0xA1, 0x27, 0xF6, 0x3E, 0xC8, 0xF3, 0x2D, 0x3D, 
@@ -151,6 +70,89 @@ out6 = [ 0x4D, 0x10, 0x51, 0xA1, 0x23, 0xAF, 0xB6, 0x70,
   0xCB, 0x51, 0x15, 0xF0, 0x34, 0xF0, 0x3D, 0x31, 
   0x17, 0x1C, 0xA7, 0x5F, 0x89, 0xFC, 0xCB, 0x9F ];
 
-check(st(key1), [], st(out1))
+% check(st(key1), [], st(out1))
+
+key1  = [ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
+
+key2  = hex2dec([ 'AC', 'C3', '51', 'DC', 'F1', '62', 'FC', '3B'; 
+  'FE', '36', '3D', '2E', '29', '13', '28', '91' ]);
+
+iv1   = [ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
+
+out1  = [ 0x02, 0xF7, 0x4A, 0x1C, 0x26, 0x45, 0x6B, 0xF5, 
+  0xEC, 0xD6, 0xA5, 0x36, 0xF0, 0x54, 0x57, 0xB1,
+  0xA7, 0x8A, 0xC6, 0x89, 0x47, 0x6C, 0x69, 0x7B,
+  0x39, 0x0C, 0x9C, 0xC5, 0x15, 0xD8, 0xE8, 0x88, 
+  0x96, 0xD6, 0x73, 0x16, 0x88, 0xD1, 0x68, 0xDA,
+  0x51, 0xD4, 0x0C, 0x70, 0xC3, 0xA1, 0x16, 0xF4 ];
+
+% disp(check(st(key1), [], st(out1)))
+disp(run_rabbit(key1, key2, iv1));
+
+function [x, c] = key_setup(key0, key1, initialization_vector)
+  x = [ initialization_vector, key0(1), key1(1) ];
+  c = [ key1(2), initialization_vector, key0(2) ];
+
+  for i = 1:4
+    % x = [ x, mod(x[i] + c[i], 2^32) ];
+    rabbit_round(x, c, i);
+  end
+  % output = [ x, c ];
+end
+
+function rabbit_round(x, c, constant_index)
+  round_constants = [hex2dec('4D34D34D'), hex2dec('D34D34D3'), hex2dec('34D34D34'), hex2dec('4D34D34D')];
+  mask32 = hex2dec('FFFFFFFF');
+
+  % G1 func
+  g1 = bitxor(double(x(mod(1, 16))) + double(x(mod(9, 16))) + round_constants(constant_index), mask32);
+  g1 = bitxor(bitshift(g1, 7), bitshift(g1, -25));
+  % g1 = bitxor(g1, bitand(bitxor(x(mod(5, 16)), g1), uint32(mask32)));
+  g1 = bitxor(uint32(g1), bitand(uint32(x(mod(5, 16))) + uint32(g1), uint32(mask32)));
+
+  % G2 func
+  g2 = bitxor(double(x(mod(5, 16))) + double(x(mod(1, 16))) + round_constants(constant_index), mask32);
+  g2 = bitxor(bitshift(g2, 9), bitshift(g2, -23));
+  g2 = bitxor(uint32(g2), bitand(uint32(x(mod(9, 16))) + uint32(g2), uint32(mask32)));
+
+  % Update state
+  for j = 1:16
+    x(j) = bitand(uint32(x(mod(j + 16, 16))) + g2 + bitxor(uint32(x(mod(j, 16))), g1), mask32);
+    c(j) = bitand(uint32(c(mod(j + 16, 16))) + g1 + bitxor(uint32(c(j)), g2), mask32);
+  end
+end
+
+function output = process_block(x, c)
+  keystream = [];
+  for k = 1:128
+    % Gen. clock-controlled bit
+    bit = bitand(x(1), c(1));
+    keystream = [ keystream, bit ];
+
+    % Update internal state if necessary
+    if mod(k, 8) == 7
+      rabbit_round(x, c, round_constants(mod(k, 8)));
+    end
+  end
+  output = string(keystream);
+end
+
+function a = st(b)
+  a = char(b);
+end
+
+function out = check(key0, key1, iv, out)
+  msg = char(zeros(1, 48));
+  cipher = run_rabbit(key0, key1, iv); % Assuming you have implemented the Rabbit cipher in MATLAB
+
+  data = py.cipher.crypt(msg);
+  out = assert(isequal(data, out));
+end
+
+function output = run_rabbit(key0, key1, initialization_vector)
+  work_arrs = key_setup(key0, key1, initialization_vector);
+  output = process_block(work_arrs(1), work_arrs(2));
+end
 
 %%
