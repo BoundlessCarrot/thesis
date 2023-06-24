@@ -1,5 +1,13 @@
 %%
 
+key1  =  [00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]
+
+out1  =  [02, F7, 4A, 1C, 26, 45, 6B, F5, EC, D6, A5, 36, F0, 54, 57, B1,
+          A7, 8A, C6, 89, 47, 6C, 69, 7B, 39, 0C, 9C, C5, 15, D8, E8, 88,
+          EF, 9A, 69, 71, 8B, 82, 49, A1, A7, 3C, 5A, 6E, 5B, 90, 45, 95]
+
+tester(key1, out1)
+
 function success = rabbit_key_setup(p_instance, p_key)
     success = 0;
     key_size = numel(p_key);
@@ -141,6 +149,23 @@ function result = rabbit_rotl(x, n)
     result = bitshift(x, n) + bitshift(x, n - 32);
 end
 
+function tester(key, output)
+    % Key setup
+    instance = rabbit_instance();
+    key_size = length(key);
+    rabbit_key_setup(instance, key, key_size);
+    
+    % Generate ciphertext
+    plaintext = zeros(1, length(output), 'uint8');
+    rabbit_cipher(instance, output, plaintext, length(output));
+    
+    % Compare the generated plaintext with the expected output
+    if isequal(plaintext, output)
+        disp('Output is correct!');
+    else
+        disp('Output is incorrect!');
+    end
+end
 
 %%
 % function p_dest = rabbit_cipher(p_instance, p_src)
