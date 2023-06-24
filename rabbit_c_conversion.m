@@ -8,26 +8,28 @@ out1  =  [0x02, 0xF7, 0x4A, 0x1C, 0x26, 0x45, 0x6B, 0xF5, 0xEC, 0xD6, 0xA5, 0x36
 
 tester(key1, out1)
 
-% Type declarations
-cc_byte = uint8;
-cc_uint32 = uint32;
-
-% Structure to store the instance data (internal state)
-rabbit_instance = struct('x', zeros(1, 8, 'uint32'), ...
-                         'c', zeros(1, 8, 'uint32'), ...
-                         'carry', uint32(0));
+function rabbit_instance = rabbit_instance
+    rabbit_instance = struct( ...
+        'x', zeros(1, 8, 'uint32'), ...
+        'c', zeros(1, 8, 'uint32'), ...
+        'carry', uint32(0) ...
+    );
+end
 
 % Testing function
 function tester(key, output)
     % Set up the instance
     instance = rabbit_instance;
     rabbit_key_setup(instance, key, numel(key));
+
+    % Create some sample data
+
     
     % Encrypt the plaintext
     ciphertext = zeros(size(output), 'uint8');
     rabbit_cipher(instance, output, ciphertext, numel(output));
     
-    % Compare the ciphertext with the expected output
+    % Compare the ciphertext with the expected output --> this check is incorrect, not sure where
     if isequal(ciphertext, output)
         disp('Encryption successful!');
     else
@@ -38,45 +40,42 @@ end
 % Function: rabbit_key_setup
 function status = rabbit_key_setup(p_instance, p_key, key_size)
     % Check input arguments
-    if key_size ~= 16 && key_size ~= 20 && key_size ~= 24
+    if key_size ~= 16
         status = -1;  % Error: Invalid key size
         return;
     end
     
-    % Initialize the instance data
-    p_instance.x = zeros(1, 8, 'uint32');
-    p_instance.c = zeros(1, 8, 'uint32');
-    p_instance.carry = uint32(0);
+    % Preallocate the k array
+    % k = zeros(numel(p_key) / 4, numel(p_key) / 4, 'uint32');
+    k = reshape(uint32(p_key), numel(p_key) / 4, numel(p_key) / 4);
+    
+    % Extract the key words
+    % for i = 1:numel(k)
+    %     disp(k(i, :));
+    %     disp(typecast(p_key((4*i-3),(4*i)), 'uint32'));
+    %     k(i, :) = typecast(p_key((2*i-1):(2*i)), 'uint32');
+    % end
     
     % Key setup
-    k = zeros(1, 8, 'uint32');
-    for i = 1:4
-        k(i) = typecast(p_key((4*i-3):(4*i)), 'uint32');
-        k(i+4) = k(i);
-    end
+    p_instance.x(1) = bitxor(k(1), 0x9E3779B9);
+    p_instance.x(2) = bitxor(k(2), 0x3C6EF372);
+    p_instance.x(3) = bitxor(k(3), 0xDA66D50E);
+    p_instance.x(4) = bitxor(k(4), 0x0B6B27A6);
+    p_instance.x(5) = bitxor(k(5), bitrotate(k(3), -16, 'uint32'));
+    p_instance.x(6) = bitxor(k(2), bitrotate(k(4), 16, 'uint32'));
+    p_instance.x(7) = bitxor(k(3), bitrotate(k(1), -16, 'uint32'));
+    p_instance.x(8) = bitxor(k(4), bitrotate(k(2), 16, 'uint32'));
     
-    % Initialize the cipher state
-    p_instance.x(0+1) = bitxor(k(0+1), typecast(p_key(17:20), 'uint32'));
-    p_instance.x(2+1) = bitxor(k(1+1), typecast(p_key(17:20), 'uint32'));
-    p_instance.x(4+1) = bitxor(k(2+1), typecast(p_key(17:20), 'uint32'));
-    p_instance.x(6+1) = bitxor(k(3+1), typecast(p_key(17:20), 'uint32'));
-    p_instance.x(1+1) = bitxor(bitshift(k(3+1), -16, 'uint32'), bitshift(k(2+1), 16, 'uint32'));
-    p_instance.x(3+1) = bitxor(bitshift(k(0+1), -16, 'uint32'), bitshift(k(3+1), 16, 'uint32'));
-    p_instance.x(5+1) = bitxor(bitshift(k(1+1), -16, 'uint32'), bitshift(k(0+1), 16, 'uint32'));
-    p_instance.x(7+1) = bitxor(bitshift(k(2+1), -16, 'uint32'), bitshift(k(1+1), 16, 'uint32'));
+    p_instance.c(0+1) = bitrotate(k(2+1), -16, 'uint32');
+    p_instance.c(1+1) = bitrotate(k(0+1), 16, 'uint32');
+    p_instance.c(2+1) = bitrotate(k(3+1), -16, 'uint32');
+    p_instance.c(3+1) = bitrotate(k(1+1), 16, 'uint32');
+    p_instance.c(4+1) = bitrotate(k(2+1), -16, 'uint32');
+    p_instance.c(5+1) = bitrotate(k(0+1), 16, 'uint32');
+    p_instance.c(6+1) = bitrotate(k(3+1), -16, 'uint32');
+    p_instance.c(7+1) = bitrotate(k(1+1), 16, 'uint32');
     
-    % Generate initial state values
-    p_instance.c(0+1) = bitrotate(bitxor(k(2+1), k(0+1)), 16, 'uint32');
-    p_instance.c(2+1) = bitrotate(k(0+1), 16, 'uint32');
-    p_instance.c(4+1) = bitrotate(bitxor(k(2+1), k(1+1)), 16, 'uint32');
-    p_instance.c(6+1) = bitrotate(k(1+1), 16, 'uint32');
-    p_instance.c(1+1) = bitrotate(bitxor(k(3+1), k(2+1)), 16, 'uint32');
-    p_instance.c(3+1) = bitrotate(k(2+1), 16, 'uint32');
-    p_instance.c(5+1) = bitrotate(bitxor(k(3+1), k(0+1)), 16, 'uint32');
-    p_instance.c(7+1) = bitrotate(k(0+1), 16, 'uint32');
-    
-    p_instance.carry = uint32(0);
-    
+    p_instance.carry = 0;
     status = 0;  % Success
 end
 
@@ -88,7 +87,7 @@ function status = rabbit_iv_setup(p_master_instance, p_instance, p_iv, iv_size)
         return;
     end
     
-    % Copy the master instance data to the working instance
+    % Copy the master instdispance data to the working instance
     p_instance.x = p_master_instance.x;
     p_instance.c = p_master_instance.c;
     p_instance.carry = p_master_instance.carry;
@@ -137,7 +136,7 @@ function status = rabbit_cipher(p_instance, p_src, p_dest, data_size)
         encrypted = bitxor(block, ks);
         
         % Store the encrypted block
-        p_dest(((i-1)*16+1):(i*16)) = typecast(encrypted, 'uint8');
+        p_dest(i, :) = typecast(reshape(encrypted(i,:), 1, []), 'uint8');
     end
     
     status = 0;  % Success
@@ -151,12 +150,11 @@ function ks = rabbit_keystream(p_instance)
     end
     
     % Generate the keystream
-    ks = zeros(1, 16, 'uint8');
-    for i = 0:7
-        ks(i*4+1) = typecast(bitand(p_instance.x(i+1), 255, 'uint32'), 'uint8');
-        ks(i*4+2) = typecast(bitand(bitshift(p_instance.x(i+1), -8, 'uint32'), 255, 'uint32'), 'uint8');
-        ks(i*4+3) = typecast(bitand(bitshift(p_instance.x(i+1), -16, 'uint32'), 255, 'uint32'), 'uint8');
-        ks(i*4+4) = typecast(bitand(bitshift(p_instance.x(i+1), -24, 'uint32'), 255, 'uint32'), 'uint8');
+    ks = zeros(4, 4, 'uint32');
+    ks(1,:) = bitand(p_instance.x(1), 255, 'uint32');
+
+    for i = 2:4   
+        ks(i,:) = bitand(bitshift(p_instance.x(i), -(8*(i-1)), 'uint32'), 255, 'uint32');
     end
     
     % Update the instance state again
